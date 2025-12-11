@@ -1,0 +1,2 @@
+C:/Users/mans/AndroidStudioProjects/uber_rider/android/app/.cxx/Debug/m1u6rb2t/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/mans/AndroidStudioProjects/uber_rider/android/app/.cxx/Debug/m1u6rb2t/arm64-v8a/CMakeFiles/rebuild_cache.dir

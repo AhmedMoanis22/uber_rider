@@ -1,0 +1,1 @@
+C:\Users\mans\AndroidStudioProjects\uber_rider\build\app\intermediates\cxx\Debug\12435u26\obj\arm64-v8a
