@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../data/model/active_ride_model.dart';
 
+/// Base class for all ride tracking states
 abstract class RideTrackingState extends Equatable {
   const RideTrackingState();
 
@@ -10,8 +11,14 @@ abstract class RideTrackingState extends Equatable {
   List<Object?> get props => [];
 }
 
+// ============================================================================
+// Initial and Waiting States
+// ============================================================================
+
+/// Initial state when no ride is active
 class RideTrackingInitial extends RideTrackingState {}
 
+/// State when waiting for a driver to accept the ride request
 class RideWaitingForDriver extends RideTrackingState {
   final String message;
 
@@ -21,6 +28,11 @@ class RideWaitingForDriver extends RideTrackingState {
   List<Object?> get props => [message];
 }
 
+// ============================================================================
+// Driver States
+// ============================================================================
+
+/// State when a driver has accepted the ride
 class DriverAccepted extends RideTrackingState {
   final String driverName;
   final String driverPhone;
@@ -49,6 +61,7 @@ class DriverAccepted extends RideTrackingState {
       ];
 }
 
+/// State when driver location is updated during the ride
 class DriverLocationUpdated extends RideTrackingState {
   final LatLng driverLocation;
   final double rotation;
@@ -58,9 +71,9 @@ class DriverLocationUpdated extends RideTrackingState {
   final String vehicleInfo;
   final String plateNumber;
   final double driverRating;
-  final LatLng? destination; // Current destination (pickup or dropoff)
+  final LatLng? destination;
   final String destinationType; // 'pickup' or 'dropoff'
-  final String rideStatus; // Current ride status
+  final String rideStatus;
 
   const DriverLocationUpdated({
     required this.driverLocation,
@@ -90,8 +103,22 @@ class DriverLocationUpdated extends RideTrackingState {
         destinationType,
         rideStatus,
       ];
+
+  /// Helper method to get driver details as a map
+  Map<String, dynamic> get driverDetails => {
+        'name': driverName,
+        'phone': driverPhone,
+        'vehicleInfo': vehicleInfo,
+        'plateNumber': plateNumber,
+        'rating': driverRating,
+      };
 }
 
+// ============================================================================
+// Ride Status States
+// ============================================================================
+
+/// State when ride status changes (arrived, in-progress, etc.)
 class RideStatusUpdated extends RideTrackingState {
   final String status;
 
@@ -99,8 +126,15 @@ class RideStatusUpdated extends RideTrackingState {
 
   @override
   List<Object?> get props => [status];
+
+  /// Helper methods for status checks
+  bool get isArrived => status == 'arrived';
+  bool get isInProgress => status == 'in-progress';
+  bool get isCompleted => status == 'completed';
+  bool get isCancelled => status == 'cancelled';
 }
 
+/// State when ride is completed
 class RideCompleted extends RideTrackingState {
   final String rideId;
 
@@ -110,6 +144,7 @@ class RideCompleted extends RideTrackingState {
   List<Object?> get props => [rideId];
 }
 
+/// State to show rating dialog after ride completion
 class ShowRatingDialog extends RideTrackingState {
   final String rideId;
   final double finalFare;
@@ -124,21 +159,22 @@ class ShowRatingDialog extends RideTrackingState {
   });
 
   @override
-  List<Object?> get props =>
-      [rideId, finalFare, actualDistance, actualDuration];
+  List<Object?> get props => [
+        rideId,
+        finalFare,
+        actualDistance,
+        actualDuration,
+      ];
 }
 
-class RideTrackingError extends RideTrackingState {
-  final String message;
+// ============================================================================
+// Active Ride States
+// ============================================================================
 
-  const RideTrackingError(this.message);
+/// Loading state when fetching active ride
+class ActiveRideLoading extends RideTrackingState {}
 
-  @override
-  List<Object?> get props => [message];
-}
-
-class ActiveRideLoaing extends RideTrackingState {}
-
+/// State when active ride data is loaded
 class ActiveRideLoaded extends RideTrackingState {
   final ActiveRideModel activeRideData;
 
@@ -148,10 +184,25 @@ class ActiveRideLoaded extends RideTrackingState {
   List<Object?> get props => [activeRideData];
 }
 
+/// Error state when active ride fetch fails
 class ActiveRideError extends RideTrackingState {
   final String message;
 
   const ActiveRideError(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
+
+// ============================================================================
+// Error States
+// ============================================================================
+
+/// General error state for ride tracking
+class RideTrackingError extends RideTrackingState {
+  final String message;
+
+  const RideTrackingError(this.message);
 
   @override
   List<Object?> get props => [message];
