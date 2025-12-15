@@ -135,9 +135,6 @@ class RideTrackingCubit extends Cubit<RideTrackingState> {
     socketService.on('ride:completed', (data) {
       print('✅ Ride completed: $data');
 
-      // Extract ride ID before clearing
-      final completedRideId = _activeRideId ?? '';
-
       // Stop tracking
       _stopTrackingDriver();
 
@@ -146,8 +143,15 @@ class RideTrackingCubit extends Cubit<RideTrackingState> {
         body: "Thank you for riding with us!",
       );
 
+      // Emit state to show rating dialog with ride completion data
+      emit(ShowRatingDialog(
+        rideId: data['rideId'] ?? _activeRideId ?? '',
+        finalFare: (data['finalFare'] ?? 0.0).toDouble(),
+        actualDistance: (data['actualDistance'] ?? 0.0).toDouble(),
+        actualDuration: (data['actualDuration'] ?? 0).toInt(),
+      ));
+
       _clearRideData();
-      emit(RideCompleted(completedRideId));
     });
 
     print('✅ Socket listeners setup complete');

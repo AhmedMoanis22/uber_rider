@@ -110,6 +110,24 @@ class RideCompleted extends RideTrackingState {
   List<Object?> get props => [rideId];
 }
 
+class ShowRatingDialog extends RideTrackingState {
+  final String rideId;
+  final double finalFare;
+  final double actualDistance;
+  final int actualDuration;
+
+  const ShowRatingDialog({
+    required this.rideId,
+    required this.finalFare,
+    required this.actualDistance,
+    required this.actualDuration,
+  });
+
+  @override
+  List<Object?> get props =>
+      [rideId, finalFare, actualDistance, actualDuration];
+}
+
 class RideTrackingError extends RideTrackingState {
   final String message;
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:georouter/georouter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../data/model/nearby_driver_model.dart';
@@ -25,6 +26,8 @@ class MapCubit extends Cubit<MapState> {
   LatLng? toLocation;
   String? fromAddress;
   String? toAddress;
+
+  final GeoRouter _geoRouter = GeoRouter(mode: TravelMode.driving);
 
   // Initialize map and get current location
   Future<void> initializeMap() async {
@@ -182,24 +185,80 @@ class MapCubit extends Cubit<MapState> {
   }
 
   // Draw route between from and to locations
-  void _drawRoute() {
+  Future<void> _drawRoute() async {
     if (fromLocation == null || toLocation == null) return;
 
-    // Remove existing route
+    try {
+      // Remove existing route
+      polylines.removeWhere((polyline) => polyline.polylineId.value == 'route');
+
+      // Get real directions using georouter
+      final coordinates = [
+        PolylinePoint(
+          latitude: fromLocation!.latitude,
+          longitude: fromLocation!.longitude,
+        ),
+        PolylinePoint(
+          latitude: toLocation!.latitude,
+          longitude: toLocation!.longitude,
+        ),
+      ];
+
+      final directions =
+          await _geoRouter.getDirectionsBetweenPoints(coordinates);
+
+      // Convert georouter PolylinePoints to Google Maps LatLng
+      final routePoints = directions
+          .map((point) => LatLng(point.latitude, point.longitude))
+          .toList();
+
+      // Add polyline with real route
+      polylines.add(
+        Polyline(
+          polylineId: const PolylineId('route'),
+          points: routePoints,
+          color: const Color(0xFF2196F3),
+          width: 5,
+        ),
+      );
+
+      // Adjust camera to show both markers
+      await _fitBounds();
+
+      // Update the UI
+      if (currentPosition != null) {
+        emit(MapLoadedState(currentPosition!));
+      }
+    } on GeoRouterException catch (e) {
+      print('GeoRouter error: ${e.toString()}');
+      // Fall back to straight line if routing fails
+      _drawStraightLine();
+    } catch (e) {
+      print('Error drawing route: $e');
+      // Fall back to straight line if routing fails
+      _drawStraightLine();
+    }
+  }
+
+  // Fallback method to draw straight line if routing fails
+  void _drawStraightLine() {
+    if (fromLocation == null || toLocation == null) return;
+
     polylines.removeWhere((polyline) => polyline.polylineId.value == 'route');
 
-    // Add polyline connecting from and to
     polylines.add(
       Polyline(
         polylineId: const PolylineId('route'),
         points: [fromLocation!, toLocation!],
         color: const Color(0xFF2196F3),
         width: 5,
+        patterns: [PatternItem.dash(10), PatternItem.gap(5)],
       ),
     );
 
-    // Adjust camera to show both markers
-    _fitBounds();
+    if (currentPosition != null) {
+      emit(MapLoadedState(currentPosition!));
+    }
   }
 
   // Fit camera bounds to show both markers

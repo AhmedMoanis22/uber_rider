@@ -153,6 +153,17 @@ class _HomeScreenView extends StatelessWidget {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           showRatingDialog(context, trackingState.rideId);
                         });
+                      } else if (trackingState is ShowRatingDialog) {
+                        print(
+                            '🎉 Ride completed! Final fare: ${trackingState.finalFare}');
+
+                        // Remove driver marker
+                        trackingCubit.removeDriverMarkerFromMap(mapCubit);
+
+                        // Show rating dialog with ride completion data
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          showRatingDialog(context, trackingState.rideId);
+                        });
                       }
                       return Stack(
                         children: [

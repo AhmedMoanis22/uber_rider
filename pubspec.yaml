@@ -40,6 +40,7 @@ dependencies:
   fluttertoast: ^8.2.8
   geocoding: ^3.0.0
   geolocator: ^14.0.2
+  georouter: ^0.0.1+1
   get: ^4.7.3
   get_it: ^9.1.1
   google_maps_flutter: ^2.14.0

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -28,7 +29,18 @@ class _TripScreenState extends State<TripScreen> {
   bool showFromMap = false;
   bool showToMap = false;
 
-  LatLng defaultLocation = const LatLng(30.0444, 31.2357); // Cairo, Egypt
+  LatLng defaultLocation =
+      const LatLng(30.0444, 31.2357); // Will be updated with current location
+  bool isLoadingLocation = true;
+
+  // Cache for addresses to avoid duplicate requests
+  final Map<String, String> _addressCache = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+  }
 
   @override
   void dispose() {
@@ -39,13 +51,98 @@ class _TripScreenState extends State<TripScreen> {
     super.dispose();
   }
 
+  // Get current location
+  Future<void> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled;
+      LocationPermission permission;
+
+      // Check if location services are enabled
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          isLoadingLocation = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('Location services are disabled. Please enable them.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Check for location permissions
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            isLoadingLocation = false;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location permissions are denied'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          isLoadingLocation = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Location permissions are permanently denied. Please enable them in settings.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Get current position
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      setState(() {
+        defaultLocation = LatLng(position.latitude, position.longitude);
+        isLoadingLocation = false;
+      });
+    } catch (e) {
+      print('Error getting location: $e');
+      setState(() {
+        isLoadingLocation = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error getting location: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _onFromMapTap(LatLng location) async {
     setState(() {
       fromLocation = location;
       fromController.text = 'Getting address...';
     });
 
-    // Get address from coordinates
+    // Get address from coordinates with caching
     String address = await _getAddressFromLatLng(location);
 
     setState(() {
@@ -59,7 +156,7 @@ class _TripScreenState extends State<TripScreen> {
       toController.text = 'Getting address...';
     });
 
-    // Get address from coordinates
+    // Get address from coordinates with caching
     String address = await _getAddressFromLatLng(location);
 
     setState(() {
@@ -67,13 +164,22 @@ class _TripScreenState extends State<TripScreen> {
     });
   }
 
-  // Get address from coordinates
+  // Get address from coordinates with caching
   Future<String> _getAddressFromLatLng(LatLng location) async {
+    // Create cache key from coordinates (rounded to 4 decimal places)
+    String cacheKey =
+        '${location.latitude.toStringAsFixed(4)}_${location.longitude.toStringAsFixed(4)}';
+
+    // Check cache first
+    if (_addressCache.containsKey(cacheKey)) {
+      return _addressCache[cacheKey]!;
+    }
+
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(
         location.latitude,
         location.longitude,
-      );
+      ).timeout(const Duration(seconds: 5));
 
       if (placemarks.isNotEmpty) {
         Placemark place = placemarks[0];
@@ -98,10 +204,27 @@ class _TripScreenState extends State<TripScreen> {
           return '${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}';
         }
 
+        // Cache the address
+        _addressCache[cacheKey] = address;
         return address;
       }
     } catch (e) {
       print('Error getting address: $e');
+
+      // Show user-friendly message for rate limiting
+      if (e.toString().contains('Too many requests') ||
+          e.toString().contains('rate')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Address lookup temporarily unavailable. Using coordinates.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
     }
 
     return '${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}';
@@ -147,6 +270,40 @@ class _TripScreenState extends State<TripScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
+
+                  // Loading indicator for location
+                  if (isLoadingLocation)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.primary.withOpacity(0.3),
+                        ),
+                      ),
+                      child: const Row(
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            'Getting your current location...',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   // From location
                   GestureDetector(
